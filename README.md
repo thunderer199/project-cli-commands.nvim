@@ -35,6 +35,7 @@ Quickly run your project cli commands with [Telescope](https://github.com/nvim-t
   - [Run command after](#run-command-after)
   - [Environment variables](#environment-variables)
   - [Inject current buffer path to command](#inject-current-buffer-path-to-command)
+  - [Placeholder suggested values](#placeholder-suggested-values)
   - [List of running commands](#list-of-running-commands)
 - [Possible improvments](#todo)
 
@@ -136,6 +137,7 @@ Example of `config.json`:
     - `cmd` - terminal command to run.
     - `env` - (optional) path to the environment file. It will be loaded before running the command.
     - `after` - (optional) neovim command to run after the terminal command.
+    - `placeholders` - (optional) map of placeholder names to lists of allowed values (see [Placeholder suggested values](#placeholder-suggested-values)).
 
 Example merge behavior (global + project override):
 
@@ -221,6 +223,29 @@ For example you would like to run test for current buffer you can configure it l
   }
 }
 ```
+
+#### Placeholder suggested values
+
+Use `${name}` tokens in your command and define a `placeholders` map to restrict each token to a predefined list of values. When the command is executed, a Telescope picker opens for each placeholder in order — the selected values are substituted before the terminal starts. Pressing `<Esc>` or `<C-c>` in any picker cancels the entire execution.
+
+```json
+{
+  "commands": {
+    "deploy": {
+      "cmd": "deploy.sh --env ${environment} --region ${region}",
+      "placeholders": {
+        "environment": ["staging", "production"],
+        "region": ["us-east-1", "eu-west-1", "ap-southeast-1"]
+      }
+    }
+  }
+}
+```
+
+- Multiple placeholders are resolved sequentially, left-to-right.
+- The same resolved value is substituted for every occurrence of `${name}` in the command.
+- `${currentBuffer}` is always resolved automatically and cannot be used as a placeholder name.
+- If a placeholder name in the map has no matching `${name}` token in `cmd`, or vice versa, a warning is shown and execution is aborted.
 
 #### List of running commands
 

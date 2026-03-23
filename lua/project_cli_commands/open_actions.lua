@@ -20,51 +20,53 @@ M.execute_script_with_params = function(prompt_bufnr, with_params, direction, si
     params = ' ' .. vim.fn.input(selection.code .. ' ')
   end
 
-  local id = next_id()
-  -- Get the current buffer's full path
-  local current_buffer_path = vim.fn.expand('%:p')
-
   local cmdLine = selection.value .. params
 
-  -- Replace `${currentBuffer}` with the current buffer's path
-  cmdLine = cmdLine:gsub("%${currentBuffer}", current_buffer_path)
+  local function run_terminal(finalCmd)
+    -- Get the current buffer's full path
+    local current_buffer_path = vim.fn.expand('%:p')
 
-  local termParams = {
-    id            = id,
-    cmd           = cmdLine,
-    hidden        = true,
-    close_on_exit = false,
-    -- direction     = direction,
-    -- size          = size,
-  }
+    -- Replace `${currentBuffer}` with the current buffer's path
+    finalCmd = finalCmd:gsub("%${currentBuffer}", current_buffer_path)
 
-  local env
-  if selection.env then
-    -- Resolve per-command env file relative to the config that defined
-    -- this command (global or project).
-    env = getEnvTable(selection.env, selection.env_base_dir)
-  end
+    local termParams = {
+      id            = next_id(),
+      cmd           = finalCmd,
+      hidden        = true,
+      close_on_exit = false,
+    }
 
-  if not env then
-    env = require('project_cli_commands').envTable
-  end
-
-  if env then
-    termParams.env = env
-  end
-
-  local cmdTerm = Terminal:new(termParams)
-
-  if selection.after then
-    cmdTerm.on_exit = function()
-      -- print("on_exit", selection.after)
-      vim.cmd(selection.after)
+    local env
+    if selection.env then
+      -- Resolve per-command env file relative to the config that defined
+      -- this command (global or project).
+      env = getEnvTable(selection.env, selection.env_base_dir)
     end
+
+    if not env then
+      env = require('project_cli_commands').envTable
+    end
+
+    if env then
+      termParams.env = env
+    end
+
+    local cmdTerm = Terminal:new(termParams)
+
+    if selection.after then
+      cmdTerm.on_exit = function()
+        vim.cmd(selection.after)
+      end
+    end
+
+    cmdTerm:toggle(size, direction)
   end
 
-  cmdTerm:toggle(size, direction)
-  -- print(vim.inspect(scriptsFromJson[selection.value]))
-  -- print(vim.inspect(selection.value))
+  if not with_params and selection.placeholders then
+    require('project_cli_commands.placeholders').resolve(cmdLine, selection.placeholders, run_terminal)
+  else
+    run_terminal(cmdLine)
+  end
 end
 
 M.execute_script = function(prompt_bufnr, direction, size)
