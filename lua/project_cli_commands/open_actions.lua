@@ -13,7 +13,6 @@ M.execute_script_with_params = function(prompt_bufnr, with_params, direction, si
   direction = direction or "horizontal"
 
   local selection = state.get_selected_entry()
-  actions.close(prompt_bufnr)
 
   local params = ''
   if with_params then
@@ -62,10 +61,19 @@ M.execute_script_with_params = function(prompt_bufnr, with_params, direction, si
     cmdTerm:toggle(size, direction)
   end
 
-  if not with_params and selection.placeholders then
-    require('project_cli_commands.placeholders').resolve(cmdLine, selection.placeholders, run_terminal)
+  local function after_placeholders(resolvedCmd)
+    actions.close(prompt_bufnr)
+    local extraParams = ''
+    if with_params then
+      extraParams = ' ' .. vim.fn.input(selection.value .. ' ')
+    end
+    run_terminal(resolvedCmd .. extraParams)
+  end
+
+  if selection.placeholders then
+    require('project_cli_commands.placeholders').resolve(cmdLine, selection.placeholders, after_placeholders)
   else
-    run_terminal(cmdLine)
+    after_placeholders(cmdLine)
   end
 end
 
