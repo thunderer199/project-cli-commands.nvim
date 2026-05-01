@@ -14,13 +14,6 @@ M.execute_script_with_params = function(prompt_bufnr, with_params, direction, si
 
   local selection = state.get_selected_entry()
 
-  local params = ''
-  if with_params then
-    params = ' ' .. vim.fn.input(selection.code .. ' ')
-  end
-
-  local cmdLine = selection.value .. params
-
   local function run_terminal(finalCmd)
     -- Get the current buffer's full path
     local current_buffer_path = vim.fn.expand('%:p')
@@ -62,17 +55,21 @@ M.execute_script_with_params = function(prompt_bufnr, with_params, direction, si
   end
 
   local function after_placeholders(resolvedCmd)
-    actions.close(prompt_bufnr)
+    pcall(actions.close, prompt_bufnr)
     local extraParams = ''
     if with_params then
-      extraParams = ' ' .. vim.fn.input(selection.value .. ' ')
+      extraParams = ' ' .. vim.fn.input(selection.code .. ' ')
     end
     run_terminal(resolvedCmd .. extraParams)
   end
 
   if selection.placeholders then
-    require('project_cli_commands.placeholders').resolve(cmdLine, selection.placeholders, after_placeholders)
+    require('project_cli_commands.placeholders').resolve(selection.value, selection.placeholders, after_placeholders, prompt_bufnr)
   else
+    local cmdLine = selection.value
+    if with_params then
+      cmdLine = cmdLine .. ' ' .. vim.fn.input(selection.code .. ' ')
+    end
     after_placeholders(cmdLine)
   end
 end

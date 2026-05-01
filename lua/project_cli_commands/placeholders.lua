@@ -44,7 +44,7 @@ local function validate(cmd, placeholders)
   return nil
 end
 
-local function resolve_sequential(cmd, placeholders, resolved, names, index, callback, cancel_state)
+local function resolve_sequential(cmd, placeholders, resolved, names, index, callback, cancel_state, main_prompt_bufnr)
   if index > #names then
     local result = cmd
     for name, value in pairs(resolved) do
@@ -55,6 +55,9 @@ local function resolve_sequential(cmd, placeholders, resolved, names, index, cal
   end
 
   if cancel_state.cancelled then
+    if main_prompt_bufnr then
+      pcall(actions.close, main_prompt_bufnr)
+    end
     return
   end
 
@@ -80,12 +83,15 @@ local function resolve_sequential(cmd, placeholders, resolved, names, index, cal
         actions.close(prompt_bufnr)
         if selection then
           resolved[name] = selection.value
-          resolve_sequential(cmd, placeholders, resolved, names, index + 1, callback, cancel_state)
+          resolve_sequential(cmd, placeholders, resolved, names, index + 1, callback, cancel_state, main_prompt_bufnr)
         end
       end)
       map('i', '<Esc>', function()
         cancel_state.cancelled = true
         actions.close(prompt_bufnr)
+        if main_prompt_bufnr then
+          pcall(actions.close, main_prompt_bufnr)
+        end
         vim.notify("project-cli-commands: placeholder selection cancelled", vim.log.levels.WARN)
       end)
       return true
@@ -93,7 +99,7 @@ local function resolve_sequential(cmd, placeholders, resolved, names, index, cal
   }):find()
 end
 
-M.resolve = function(cmd, placeholders, callback)
+M.resolve = function(cmd, placeholders, callback, main_prompt_bufnr)
   if type(placeholders) ~= "table" then
     vim.notify("project-cli-commands: placeholders must be a table", vim.log.levels.WARN)
     return
@@ -112,7 +118,7 @@ M.resolve = function(cmd, placeholders, callback)
     return
   end
 
-  resolve_sequential(cmd, placeholders, {}, names, 1, callback, { cancelled = false })
+  resolve_sequential(cmd, placeholders, {}, names, 1, callback, { cancelled = false }, main_prompt_bufnr)
 end
 
 return M
