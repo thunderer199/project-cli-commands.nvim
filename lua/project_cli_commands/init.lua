@@ -45,7 +45,7 @@ M.open = function(opts)
   end
   local scriptsNames    = {}
   for command_key, code in pairs(scriptsFromJson) do
-    local cmd, env, after, name, description
+    local cmd, env, after, name, description, placeholders
 
     if type(code) == "string" then
       cmd = code
@@ -55,6 +55,7 @@ M.open = function(opts)
       cmd = code["cmd"]
       env = code["env"]
       after = code["after"]
+      placeholders = code["placeholders"]
       name = (code["name"] ~= vim.NIL and code["name"]) or command_key
       description = (code["description"] ~= vim.NIL and code["description"]) or code["cmd"]
     end
@@ -66,6 +67,7 @@ M.open = function(opts)
       cmd = cmd,
       env = env,
       after = after,
+      placeholders = placeholders,
     })
   end
 
@@ -110,7 +112,8 @@ M.open = function(opts)
           -- Track where this command came from so command-level `env` paths
           -- are resolved relative to the correct config directory.
           env_base_dir = mergedConfigResult.commandBaseDirs[entry.command_key],
-          after = entry.after
+          after = entry.after,
+          placeholders = entry.placeholders
         }
       end,
     },
