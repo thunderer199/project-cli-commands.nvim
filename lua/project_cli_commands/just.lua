@@ -112,10 +112,10 @@ local newCommand = function(recipeName, description, requires_args)
   local cmd = "just " .. recipeName
 
   return {
+    -- The key keeps the full invocation, so typing "just" in the picker still
+    -- filters the list down to recipes even though the name column is bare.
     command_key = cmd,
-    -- The name column is the literal invocation, which keeps `just build`
-    -- distinct from a config command named `build` without extra decoration.
-    name = cmd,
+    name = recipeName,
     description = description or cmd,
     cmd = cmd,
     -- Marks the entry as coming from the justfile so env injection is skipped;

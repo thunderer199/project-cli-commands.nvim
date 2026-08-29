@@ -256,20 +256,22 @@ the file lookup itself, so the same justfile it would pick from your current dir
 (including ones in parent directories) is the one you see recipes from.
 
 ```
-alpha         ||  echo alpha
-build         ||  npm run build
-just build    ||  Build the project
-just deploy   ||  Deploy to an environment
+alpha       ||  echo alpha
+lint        ||  npm run lint
+build       ||  Build the project
+deploy      ||  Deploy to an environment
 ```
 
-Recipes appear as the literal command you'd type, so a recipe named `build` stays
-distinct from a `build` in your `config.json` — both are listed, neither is hidden.
+Recipes are listed under their own name, after the commands from `config.json`. A
+recipe and a command may share a name — both are listed, neither is hidden. Typing
+`just` in the picker narrows the list to recipes.
+
 The description column shows the recipe's doc comment, falling back to the first line
 of its body when there isn't one.
 
 - Private recipes (`[private]` or a leading underscore) are left out, as `just --list` leaves them out.
 - Aliases are left out too, since the recipe an alias points at is already in the list.
-- Recipes from imported modules are listed under their full path, e.g. `just sub::inner`.
+- Recipes from imported modules are listed under their full path, e.g. `sub::inner`.
 - A recipe with a parameter that has no default opens the input prompt so you can pass
   arguments, the same as pressing `<C-i>`.
 - Recipes run without the environment from `env` — a justfile loads its own dotenv files
