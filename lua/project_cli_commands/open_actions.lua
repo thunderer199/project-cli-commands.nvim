@@ -14,6 +14,12 @@ M.execute_script_with_params = function(prompt_bufnr, with_params, direction, si
 
   local selection = state.get_selected_entry()
 
+  -- A recipe with a required parameter can't run bare, so send it to the input
+  -- prompt even when the mapping didn't ask for one.
+  if selection.requires_args then
+    with_params = true
+  end
+
   local function run_terminal(finalCmd)
     -- Get the current buffer's full path
     local current_buffer_path = vim.fn.expand('%:p')
@@ -29,14 +35,18 @@ M.execute_script_with_params = function(prompt_bufnr, with_params, direction, si
     }
 
     local env
-    if selection.env then
-      -- Resolve per-command env file relative to the config that defined
-      -- this command (global or project).
-      env = getEnvTable(selection.env, selection.env_base_dir)
-    end
+    -- A justfile loads its own dotenv files, so recipes run without the env the
+    -- config injects into its own commands.
+    if selection.source ~= "just" then
+      if selection.env then
+        -- Resolve per-command env file relative to the config that defined
+        -- this command (global or project).
+        env = getEnvTable(selection.env, selection.env_base_dir)
+      end
 
-    if not env then
-      env = require('project_cli_commands').envTable
+      if not env then
+        env = require('project_cli_commands').envTable
+      end
     end
 
     if env then
@@ -66,11 +76,8 @@ M.execute_script_with_params = function(prompt_bufnr, with_params, direction, si
   if selection.placeholders then
     require('project_cli_commands.placeholders').resolve(selection.value, selection.placeholders, after_placeholders, prompt_bufnr)
   else
-    local cmdLine = selection.value
-    if with_params then
-      cmdLine = cmdLine .. ' ' .. vim.fn.input(selection.code .. ' ')
-    end
-    after_placeholders(cmdLine)
+    -- after_placeholders prompts for the input params, so don't also prompt here.
+    after_placeholders(selection.value)
   end
 end
 

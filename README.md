@@ -36,6 +36,7 @@ Quickly run your project cli commands with [Telescope](https://github.com/nvim-t
   - [Environment variables](#environment-variables)
   - [Inject current buffer path to command](#inject-current-buffer-path-to-command)
   - [Placeholder suggested values](#placeholder-suggested-values)
+  - [Just integration](#just-integration)
   - [List of running commands](#list-of-running-commands)
 - [Possible improvments](#todo)
 
@@ -105,7 +106,7 @@ Both files use the same JSON schema. When both files exist, the plugin merges th
 - Commands with the same name are overridden by project config
 - Keys that exist only in global config remain available
 
-If neither file exists and you run `Telescope project_cli_commands open`, the plugin asks to create `.nvim/config.json` in the current project.
+If neither file exists and you run `Telescope project_cli_commands open`, the plugin asks to create `.nvim/config.json` in the current project — unless the project has a [justfile](#just-integration), in which case its recipes are listed and you aren't asked for anything.
 
 Example of `config.json`:
 
@@ -247,6 +248,49 @@ Use `${name}` tokens in your command and define a `placeholders` map to restrict
 - `${currentBuffer}` is always resolved automatically and cannot be used as a placeholder name.
 - If a placeholder name in the map has no matching `${name}` token in `cmd`, or vice versa, a warning is shown and execution is aborted.
 
+#### Just integration
+
+If the project has a [justfile](https://just.systems/), its recipes are listed in the
+picker alongside the commands from `config.json` — no configuration needed. `just` does
+the file lookup itself, so the same justfile it would pick from your current directory
+(including ones in parent directories) is the one you see recipes from.
+
+```
+alpha       ||  echo alpha
+lint        ||  npm run lint
+build       ||  Build the project
+deploy      ||  Deploy to an environment
+```
+
+Recipes are listed under their own name, after the commands from `config.json`. A
+recipe and a command may share a name — both are listed, neither is hidden. Typing
+`just` in the picker narrows the list to recipes.
+
+The description column shows the recipe's doc comment, falling back to the first line
+of its body when there isn't one.
+
+- Private recipes (`[private]` or a leading underscore) are left out, as `just --list` leaves them out.
+- Aliases are left out too, since the recipe an alias points at is already in the list.
+- Recipes from imported modules are listed under their full path, e.g. `sub::inner`.
+- A recipe with a parameter that has no default opens the input prompt so you can pass
+  arguments, the same as pressing `<C-i>`.
+- Recipes run without the environment from `env` — a justfile loads its own dotenv files
+  via `set dotenv-load`, and layering both would give you two sets of rules for the same
+  variables.
+
+Nothing happens if `just` isn't installed or the project has no justfile. If a justfile
+is there but can't be parsed, the error from `just` is reported.
+
+To turn the integration off:
+
+```lua
+require('project_cli_commands').setup({
+  just = {
+    enabled = false,
+  },
+})
+```
+
 #### List of running commands
 
 You can open list of running commands with `Telescope project_cli_commands running`. There you can show/hide terminal for each command. Or you can stop running command.
@@ -261,6 +305,7 @@ You can open list of running commands with `Telescope project_cli_commands runni
 - [x] add environment variables to run commands
 - [x] table config for commands
 - [x] after command (e.g. run 'LspRestart' after terminal command)
+- [x] run recipes from a justfile
 - [ ] current directory path variable ${currentDirectory}
 - [ ] scroll preview content
 - [ ] copy to clipboard with ${currentBuffer}

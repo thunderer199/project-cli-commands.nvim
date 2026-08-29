@@ -96,7 +96,8 @@ local mergeConfig = function(globalConfig, projectConfig, globalDirPath, project
 end
 
 
-M.openConfigFile = function(globalConfigPath)
+M.openConfigFile = function(globalConfigPath, opts)
+  opts = opts or {}
   local projectDirPath = vim.fn.getcwd() .. '/.nvim'
   local projectConfigPath = projectDirPath .. '/config.json'
   globalConfigPath = globalConfigPath or defaultGlobalConfigPath()
@@ -116,6 +117,12 @@ M.openConfigFile = function(globalConfigPath)
   local projectConfigString = readFile(projectConfigPath)
   local projectConfig
   if projectConfigString == nil and globalConfig == nil then
+    -- Nothing to offer to create when the picker already has commands from a
+    -- justfile.
+    if opts.skipCreatePrompt then
+      return nil, ".nvim/config.json isn't found."
+    end
+
     local choice
     repeat
       choice = vim.fn.input(

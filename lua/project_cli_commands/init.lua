@@ -6,6 +6,7 @@ local conf = require("telescope.config").values
 local previewers = require("telescope.previewers")
 
 local file = require("project_cli_commands.file")
+local just = require("project_cli_commands.just")
 local openConfigFile = file.openConfigFile
 local getEnvTable = file.getEnvTable
 local defaultGlobalConfigPath = file.defaultGlobalConfigPath
@@ -25,55 +26,75 @@ local M = {}
 M.open = function(opts)
   opts = opts or {}
 
+  -- Recipes are gathered first so a justfile-only project never gets asked to
+  -- create a .nvim/config.json it doesn't need.
+  local justCommands = just.getCommands(M.config.just)
+
   -- openConfigFile returns a merged config object (global + project),
   -- not a raw JSON string.
-  local mergedConfigResult, error = openConfigFile(M.config.global_config_path)
+  local mergedConfigResult, error = openConfigFile(M.config.global_config_path, {
+    skipCreatePrompt = #justCommands > 0,
+  })
 
-  if error ~= nil then
+  if error ~= nil and #justCommands == 0 then
     return
   end
 
-  if mergedConfigResult == nil or type(mergedConfigResult.config) ~= "table" then
-    return
-  end
+  local scriptsNames = {}
+  local commandBaseDirs = {}
+  M.envTable = nil
 
-  local jsonTable = mergedConfigResult.config
+  if mergedConfigResult ~= nil and type(mergedConfigResult.config) == "table" then
+    local jsonTable = mergedConfigResult.config
+    commandBaseDirs = mergedConfigResult.commandBaseDirs or {}
 
-  local scriptsFromJson = jsonTable['commands']
-  if type(scriptsFromJson) ~= "table" then
-    return
-  end
-  local scriptsNames    = {}
-  for command_key, code in pairs(scriptsFromJson) do
-    local cmd, env, after, name, description, placeholders
+    local scriptsFromJson = jsonTable['commands']
+    if type(scriptsFromJson) == "table" then
+      for command_key, code in pairs(scriptsFromJson) do
+        local cmd, env, after, name, description, placeholders
 
-    if type(code) == "string" then
-      cmd = code
-      name = command_key
-      description = code
-    else
-      cmd = code["cmd"]
-      env = code["env"]
-      after = code["after"]
-      placeholders = code["placeholders"]
-      name = (code["name"] ~= vim.NIL and code["name"]) or command_key
-      description = (code["description"] ~= vim.NIL and code["description"]) or code["cmd"]
+        if type(code) == "string" then
+          cmd = code
+          name = command_key
+          description = code
+        else
+          cmd = code["cmd"]
+          env = code["env"]
+          after = code["after"]
+          placeholders = code["placeholders"]
+          name = (code["name"] ~= vim.NIL and code["name"]) or command_key
+          description = (code["description"] ~= vim.NIL and code["description"]) or code["cmd"]
+        end
+
+        table.insert(scriptsNames, {
+          command_key = command_key,
+          name = name,
+          description = description,
+          cmd = cmd,
+          env = env,
+          after = after,
+          placeholders = placeholders,
+        })
+      end
     end
 
-    table.insert(scriptsNames, {
-      command_key = command_key,
-      name = name,
-      description = description,
-      cmd = cmd,
-      env = env,
-      after = after,
-      placeholders = placeholders,
-    })
+    local envPathHead = jsonTable['env']
+    M.envTable = getEnvTable(envPathHead, mergedConfigResult.envBaseDir)
   end
 
-  local envPathHead = jsonTable['env']
-  local envTable = getEnvTable(envPathHead, mergedConfigResult.envBaseDir)
-  M.envTable = envTable
+  -- Config commands come out of `pairs` in arbitrary order, so sort them for a
+  -- stable list, then append the already sorted recipes as a second block.
+  table.sort(scriptsNames, function(a, b)
+    return a.name < b.name
+  end)
+
+  for _, command in ipairs(justCommands) do
+    table.insert(scriptsNames, command)
+  end
+
+  if #scriptsNames == 0 then
+    return
+  end
 
   -- find the length of the longest script name
   local longestScriptName = 0
@@ -111,9 +132,11 @@ M.open = function(opts)
           env = entry.env,
           -- Track where this command came from so command-level `env` paths
           -- are resolved relative to the correct config directory.
-          env_base_dir = mergedConfigResult.commandBaseDirs[entry.command_key],
+          env_base_dir = commandBaseDirs[entry.command_key],
           after = entry.after,
-          placeholders = entry.placeholders
+          placeholders = entry.placeholders,
+          source = entry.source,
+          requires_args = entry.requires_args,
         }
       end,
     },
@@ -217,6 +240,10 @@ M.setup = function(config)
   local defaults = {
     -- Path to the global config file (default: stdpath('config') .. '/project-cli-commands.config.json')
     global_config_path = defaultGlobalConfigPath(),
+    -- Recipes from a justfile are listed automatically; set enabled = false to opt out
+    just = {
+      enabled = true,
+    },
     -- Key mappings bound inside the telescope window
     running_telescope_mapping = {
       ['<C-c>'] = require('project_cli_commands.actions').exit_terminal,
