@@ -49,8 +49,15 @@ local function validate(cmd, placeholders)
     local count = 0
     for i, item in ipairs(values) do
       count = i
-      if type(item) ~= "string" then
-        return "placeholders '" .. name .. "' item " .. i .. " must be a string"
+      if type(item) == "table" then
+        if type(item.value) ~= "string" then
+          return "placeholders '" .. name .. "' item " .. i .. " must have a string value"
+        end
+        if item.label ~= nil and type(item.label) ~= "string" then
+          return "placeholders '" .. name .. "' item " .. i .. " label must be a string"
+        end
+      elseif type(item) ~= "string" then
+        return "placeholders '" .. name .. "' item " .. i .. " must be a string or { label, value }"
       end
     end
     if count == 0 then
@@ -59,6 +66,22 @@ local function validate(cmd, placeholders)
   end
 
   return nil
+end
+
+local function placeholder_entry(item)
+  if type(item) == 'table' then
+    local display = item.label or item.value
+    return {
+      value = item.value,
+      display = display,
+      ordinal = display .. ' ' .. item.value,
+    }
+  end
+  return {
+    value = item,
+    display = item,
+    ordinal = item,
+  }
 end
 
 local function resolve_sequential(cmd, placeholders, resolved, names, index, callback, cancel_state, main_prompt_bufnr)
@@ -85,13 +108,7 @@ local function resolve_sequential(cmd, placeholders, resolved, names, index, cal
     prompt_title = "Select " .. name .. ":",
     finder = finders.new_table {
       results = values,
-      entry_maker = function(item)
-        return {
-          value = item,
-          display = item,
-          ordinal = item,
-        }
-      end,
+      entry_maker = placeholder_entry,
     },
     sorter = sorters.get_generic_fuzzy_sorter(),
     attach_mappings = function(prompt_bufnr, map)
