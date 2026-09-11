@@ -41,6 +41,23 @@ local function validate(cmd, placeholders)
     end
   end
 
+  for _, name in ipairs(cmd_names) do
+    local values = placeholders[name]
+    if type(values) ~= "table" then
+      return "placeholders '" .. name .. "' must be a non-empty list"
+    end
+    local count = 0
+    for i, item in ipairs(values) do
+      count = i
+      if type(item) ~= "string" then
+        return "placeholders '" .. name .. "' item " .. i .. " must be a string"
+      end
+    end
+    if count == 0 then
+      return "placeholders '" .. name .. "' must be a non-empty list"
+    end
+  end
+
   return nil
 end
 
@@ -81,9 +98,15 @@ local function resolve_sequential(cmd, placeholders, resolved, names, index, cal
       actions.select_default:replace(function()
         local selection = state.get_selected_entry()
         actions.close(prompt_bufnr)
-        if selection then
+        if selection and type(selection.value) == 'string' then
           resolved[name] = selection.value
           resolve_sequential(cmd, placeholders, resolved, names, index + 1, callback, cancel_state, main_prompt_bufnr)
+        else
+          cancel_state.cancelled = true
+          if main_prompt_bufnr then
+            pcall(actions.close, main_prompt_bufnr)
+          end
+          vim.notify("project-cli-commands: no value selected for '" .. name .. "'", vim.log.levels.WARN)
         end
       end)
       map('i', '<Esc>', function()
